@@ -14,38 +14,52 @@
  * Иногда промисы от API будут приходить в состояние rejected, (прямо как и API в реальной жизни)
  * Ответ будет приходить в поле {result}
  */
- import Api from '../tools/api';
+import Api from '../tools/api';
+import * as R from 'ramda';
 
- const api = new Api();
+const api = new Api();
 
- /**
-  * Я – пример, удали меня
-  */
- const wait = time => new Promise(resolve => {
-     setTimeout(resolve, time);
- })
+const isLengthValid = R.both(
+    R.pipe(R.length, R.gt(R.__, 2)),
+    R.pipe(R.length, R.lt(R.__, 10))
+);
+const isPositive = R.pipe(Number, R.gt(R.__, 0));
+const isNumber = R.test(/^[0-9]+\.?[0-9]*$/);
 
- const processSequence = ({value, writeLog, handleSuccess, handleError}) => {
-     /**
-      * Я – пример, удали меня
-      */
-     writeLog(value);
+const validate = R.allPass([isLengthValid, isPositive, isNumber]);
 
-     api.get('https://api.tech/numbers/base', {from: 2, to: 10, number: '01011010101'}).then(({result}) => {
-         writeLog(result);
-     });
+const toBinaryApi = n => api.get('https://api.tech/numbers/base', { from: 10, to: 2, number: n });
+const getAnimalApi = id => api.get(`https://animals.tech/${id}`, {});
 
-     wait(2500).then(() => {
-         writeLog('SecondLog')
+const processSequence = async ({ value, writeLog, handleSuccess, handleError }) => {
+    writeLog(value);
 
-         return wait(1500);
-     }).then(() => {
-         writeLog('ThirdLog');
+    if (!validate(value)) {
+        handleError('ValidationError');
+        return;
+    }
 
-         return wait(400);
-     }).then(() => {
-         handleSuccess('Done');
-     });
- }
+    try {
+        const rounded = Math.round(Number(value));
+        writeLog(rounded);
+
+        const { result: binary } = await toBinaryApi(rounded);
+        writeLog(binary);
+
+        const len = R.length(binary);
+        writeLog(len);
+
+        const squared = len * len;
+        writeLog(squared);
+
+        const mod = squared % 3;
+        writeLog(mod);
+
+        const { result: animal } = await getAnimalApi(mod);
+        handleSuccess(animal);
+    } catch (e) {
+        handleError('APIError');
+    }
+};
 
 export default processSequence;
